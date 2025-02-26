@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WhatsApp Clone</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        window.onload = () => {
+            const socket = io();
+            let btnEnviar = document.getElementById("enviar");
+            let cajaTexto = document.getElementById("cajaTexto");
+            let mensajes = document.getElementById("mensajes");
+            let avatarPreview = document.getElementById("avatar-preview");
+
+            const showLoginForm = () => {
+                document.getElementById("login-form").style.display = "block";
+                document.getElementById("chat-app").style.display = "none";
+            };
+
+            const showChatApp = () => {
+                document.getElementById("login-form").style.display = "none";
+                document.getElementById("chat-app").style.display = "block";
+            };
+
+            document.getElementById("user-avatar").addEventListener("input", () => {
+                const avatar = document.getElementById("user-avatar").value;
+                if (avatar >= 1 && avatar <= 5) {
+                    avatarPreview.src = `images/avatars/avatar${avatar}.png`;
+                } else {
+                    avatarPreview.src = '';
+                }
+            });
+
+            document.getElementById("enter-chat-btn").addEventListener("click", () => {
+                const name = document.getElementById("user-name").value;
+                const avatar = document.getElementById("user-avatar").value;
+                const status = document.getElementById("user-status").value;
+
+                if (avatar < 1 || avatar > 5) {
+                    alert("Por favor, elige un avatar entre 1 y 5.");
+                    return;
+                }
+
+                if (!name || !status) {
+                    alert("Por favor, completa todos los campos.");
+                    return;
+                }
+
+                const user = {
+                    name: name,
+                    avatar: `avatar${avatar}.png`,
+                    status: status
+                };
+
+                socket.emit('join', user);
+                showChatApp();
+            });
+
+            const enviarMensaje = () => {
+                let textoMensaje = cajaTexto.value.trim();
+                if (textoMensaje === '') {
+                    alert("No puedes enviar un mensaje vacío.");
+                    return;
+                }
+
+                let datosAEnviar = {
+                    user: document.getElementById("user-name").value,
+                    text: textoMensaje
+                };
+                socket.emit("mensaje", datosAEnviar);
+                cajaTexto.value = '';
+            };
+
+            btnEnviar.addEventListener("click", enviarMensaje);
+
+            cajaTexto.addEventListener("keypress", (event) => {
+                if (event.key === "Enter") {
+                    enviarMensaje();
+                }
+            });
+
+            socket.on("mensaje", (datos) => {
+                mensajes.innerHTML += `<li><strong>${datos.user}:</strong> ${datos.text}</li>`;
+            });
+
+            socket.on("updateUsers", (users) => {
+                let usersList = document.getElementById("users");
+                usersList.innerHTML = '';
+                users.forEach(user => {
+                    usersList.innerHTML += `<li><img src="images/avatars/${user.avatar}" alt="avatar" class="avatar"> ${user.name} (${user.status})</li>`;
+                });
+            });
+
+            socket.on("message", (message) => {
+                mensajes.innerHTML += `<li><strong>${message.user}:</strong> ${message.text}</li>`;
+            });
+
+            cajaTexto.addEventListener("input", () => {
+                socket.emit("typing", document.getElementById("user-name").value);
+            });
+
+            socket.on("typing", (user) => {
+                let typingIndicator = document.getElementById("typing");
+                typingIndicator.innerText = `${user} está escribiendo...`;
+                setTimeout(() => {
+                    typingIndicator.innerText = '';
+                }, 3000);
+            });
+
+            socket.on("userConnected", (user) => {
+                mensajes.innerHTML += `<li><em>${user.name} se ha unido al chat.</em></li>`;
+            });
+
+            socket.on("userDisconnected", (user) => {
+                mensajes.innerHTML += `<li><em>${user.name} ha salido del chat.</em></li>`;
+            });
+
+            document.getElementById("create-group-btn").addEventListener("click", () => {
+                socket.emit("createGroup");
+            });
+
+            socket.on("groupCreated", () => {
+                alert("Grupo creado. Todos los usuarios se han unido al grupo.");
+            });
+
+            showLoginForm();
+        }
+    </script>
+</head>
+<body>
+    <div id="login-form" class="login-form">
+        <h2>Ingresar al Chat</h2>
+        <input type="text" id="user-name" placeholder="Nombre">
+        <input type="number" id="user-avatar" placeholder="Avatar (1, 2, 3, 4, 5)">
+        <input type="text" id="user-status" placeholder="Estado">
+        <img id="avatar-preview" src="" alt="Vista previa del avatar" class="avatar-preview">
+        <button id="enter-chat-btn">Entrar</button>
+    </div>
+    <div id="chat-app" class="chat-app" style="display: none;">
+        <div id="app" class="app">
+            <div class="sidebar">
+                <div class="sidebar-header">
+                    <h2>Usuarios Conectados</h2>
+                </div>
+                <ul id="users" class="sidebar-users"></ul>
+                <button id="create-group-btn" class="create-group-btn">Crear Grupo</button>
+            </div>
+            <div class="chat">
+                <div class="chat-header">
+                    <h2>Chat</h2>
+                </div>
+                <div id="typing" class="typing-indicator"></div>
+                <ul id="mensajes" class="chat-messages"></ul>
+                <div class="chat-input">
+                    <input type="text" id="cajaTexto" placeholder="Escribe un mensaje...">
+                    <button id="enviar">Enviar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
